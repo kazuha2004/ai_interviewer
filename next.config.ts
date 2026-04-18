@@ -7,9 +7,7 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  experimental: {
-    skipGlobalErrorPrerenderingFallback: true,
-  },
+  output: 'standalone',
 };
 
 export default nextConfig;
