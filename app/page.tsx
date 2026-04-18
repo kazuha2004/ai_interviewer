@@ -7,6 +7,8 @@ import { isValidEmail } from '@/utils/helpers';
 import { POST } from '@/utils/api-client';
 import type { Session } from '@/lib/types';
 
+export const dynamic = 'force-dynamic';
+
 export default function Home() {
   const router = useRouter();
   const [candidateName, setCandidateName] = useState('');
