@@ -11,31 +11,26 @@ export default function GlobalError({
     <html>
       <body style={{ margin: 0 }}>
         <div style={{
-          padding: '2rem',
-          textAlign: 'center',
-          fontFamily: 'sans-serif',
-          background: '#050508',
           minHeight: '100vh',
-          color: 'white',
+          background: '#050508',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           flexDirection: 'column',
           gap: '1rem',
+          fontFamily: 'sans-serif',
+          color: 'white',
         }}>
           <h2>Something went wrong</h2>
           <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>{error.message}</p>
-          <button
-            onClick={() => reset()}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: '#4f63e8',
-              border: 'none',
-              borderRadius: '0.75rem',
-              color: 'white',
-              cursor: 'pointer',
-            }}
-          >
+          <button onClick={() => reset()} style={{
+            padding: '0.75rem 1.5rem',
+            background: '#4f63e8',
+            border: 'none',
+            borderRadius: '0.75rem',
+            color: 'white',
+            cursor: 'pointer',
+          }}>
             Try again
           </button>
         </div>
