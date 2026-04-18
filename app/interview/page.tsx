@@ -1,12 +1,7 @@
-'use client';
-
-/**
- * Interview Page
- * Main interview interface with conversation, voice I/O, and real-time interaction
- */
-
 import React, { Suspense } from 'react';
 import { InterviewClientComponent } from './interview-client';
+
+export const dynamic = 'force-dynamic';
 
 export default function InterviewPage() {
   return (
