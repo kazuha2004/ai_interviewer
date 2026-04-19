@@ -1,68 +1,64 @@
-/**
- * Session API Routes - CRUD operations
- * POST /api/sessions - Create new session
- */
+import { NextRequest } from "next/server";
+import { connectDB } from "@/lib/mongodb";
+import { Session } from "@/models/session";
 
-import { connectDB } from '@/lib/mongodb';
-import { Session } from '@/models/session';
-import { NextRequest, NextResponse } from 'next/server';
-import type { Session as ISession, ApiResponse } from '@/lib/types';
+// 🔥 CORS HEADERS (reuse everywhere)
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*", // you can restrict later
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
 
-// POST /api/sessions - Create a new interview session
-export async function POST(
-  request: NextRequest
-): Promise<NextResponse<ApiResponse<ISession>>> {
+// 🔥 HANDLE PREFLIGHT (VERY IMPORTANT)
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 200,
+    headers: corsHeaders,
+  });
+}
+
+// ✅ GET SESSIONS
+export async function GET() {
   try {
-    await connectDB(); // ✅ Always connect
+    await connectDB();
 
-    const body = await request.json();
-    const { candidateEmail, candidateName, subject } = body;
+    const sessions = await Session.find().sort({ createdAt: -1 });
 
-    // ✅ Validation
-    if (!candidateEmail || !candidateName || !subject) {
-      return NextResponse.json(
-        { success: false, error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
-
-    // ✅ Create session in MongoDB
-    const session = await Session.create({
-      candidateEmail,
-      candidateName,
-      subject,
-      status: 'in-progress',
-      startedAt: new Date(),
-      totalMessages: 0,
-      currentMode: 'interviewer',
+    return new Response(JSON.stringify({ success: true, data: sessions }), {
+      status: 200,
+      headers: corsHeaders,
     });
-
-    return NextResponse.json(
-      {
-        success: true,
-        data: {
-          _id: session._id.toString(), // ✅ always string
-          candidateEmail: session.candidateEmail,
-          candidateName: session.candidateName,
-          subject: session.subject,
-          status: session.status,
-          startedAt: session.startedAt,
-          totalMessages: session.totalMessages,
-          currentMode: session.currentMode,
-        },
-        message: 'Session created successfully',
-      },
-      { status: 201 }
-    );
   } catch (error) {
-    console.error('Error creating session:', error);
-
-    return NextResponse.json(
+    return new Response(
+      JSON.stringify({ success: false, error: "Failed to fetch sessions" }),
       {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to create session',
-      },
-      { status: 500 }
+        status: 500,
+        headers: corsHeaders,
+      }
+    );
+  }
+}
+
+// ✅ CREATE SESSION
+export async function POST(req: NextRequest) {
+  try {
+    await connectDB();
+
+    const body = await req.json();
+
+    const session = await Session.create(body);
+
+    return new Response(JSON.stringify({ success: true, data: session }), {
+      status: 201,
+      headers: corsHeaders,
+    });
+  } catch (error) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Failed to create session" }),
+      {
+        status: 500,
+        headers: corsHeaders,
+      }
     );
   }
 }

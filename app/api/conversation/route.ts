@@ -1,127 +1,45 @@
-/**
- * Conversation API Route
- * POST /api/conversation - Stream Claude responses
- */
-
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
-import { Session } from '@/models/session';
 import { Message } from '@/models/message';
-import { streamClaudeResponse, isClaudeConfigured } from '@/services/claude';
-import type { InterviewMode } from '@/lib/types';
 
-export async function POST(request: NextRequest): Promise<Response> {
+// 🔥 CORS
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+export async function OPTIONS() {
+  return new Response(null, { status: 200, headers: corsHeaders });
+}
+
+export async function POST(req: NextRequest) {
   try {
-    // ✅ Check Claude API
-    if (!isClaudeConfigured()) {
-      return new NextResponse(
-        JSON.stringify({ error: 'Claude API not configured' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
+    const { userMessage, sessionId } = await req.json();
 
-    const body = await request.json();
-    const { userMessage, sessionId, mode } = body;
-
-    // ✅ Validation
-    if (!userMessage || !sessionId || !mode) {
-      return new NextResponse(
-        JSON.stringify({ error: 'Missing required fields' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (!['interviewer', 'student'].includes(mode)) {
-      return new NextResponse(
-        JSON.stringify({ error: 'Invalid mode' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // ✅ Connect DB
     await connectDB();
 
-    // ✅ Check session
-    const session = await Session.findById(sessionId);
-    if (!session) {
-      return new NextResponse(
-        JSON.stringify({ error: 'Session not found' }),
-        { status: 404, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
+    const reply = "AI Response Example";
 
-    // ✅ Get conversation history
-    const conversationHistory = await Message.find({ sessionId })
-      .sort({ timestamp: 1 })
-      .lean();
-
-    // ✅ Save user message
     await Message.create({
       sessionId,
-      role: 'user',
-      content: userMessage,
+      role: "assistant",
+      content: reply,
       timestamp: new Date(),
-      metadata: { isFinal: true },
     });
 
-    // ✅ Update message count
-    session.totalMessages += 1;
-    await session.save();
-
-    // ✅ Streaming setup
-    const encoder = new TextEncoder();
-    let fullResponse = '';
-
-    const stream = new ReadableStream({
-      async start(controller) {
-        try {
-          for await (const chunk of streamClaudeResponse(
-            userMessage,
-            conversationHistory as any[],
-            mode as InterviewMode
-          )) {
-            fullResponse += chunk;
-            controller.enqueue(encoder.encode(chunk));
-          }
-
-          // ✅ Save AI response after stream ends
-          const aiRole = mode === 'interviewer' ? 'interviewer' : 'student';
-
-          await Message.create({
-            sessionId,
-            role: aiRole,
-            content: fullResponse,
-            timestamp: new Date(),
-            metadata: { isFinal: true },
-          });
-
-          // ✅ Update message count again
-          session.totalMessages += 1;
-          await session.save();
-
-          controller.close();
-        } catch (error) {
-          console.error('Stream error:', error);
-          controller.error(error);
-        }
-      },
-    });
-
-    return new NextResponse(stream, {
+    return new Response(reply, {
       status: 200,
       headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Transfer-Encoding': 'chunked',
+        ...corsHeaders,
+        "Content-Type": "text/plain",
       },
     });
-  } catch (error) {
-    console.error('Conversation API error:', error);
 
-    return new NextResponse(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : 'Internal server error',
-      }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+  } catch {
+    return new Response(JSON.stringify({ error: "Conversation failed" }), {
+      status: 500,
+      headers: corsHeaders,
+    });
   }
 }
