@@ -1,6 +1,5 @@
 /**
- * Evaluation API Route (MongoDB Only)
- * POST /api/evaluate - Generate evaluation from transcript
+ * Evaluation API Route (FIXED - NO DUPLICATE ERROR)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -16,18 +15,12 @@ interface ApiResponse<T> {
   error?: string;
 }
 
-/**
- * Format transcript
- */
 function formatTranscript(messages: any[]): string {
   return messages
     .map((msg) => `[${msg.role.toUpperCase()}]: ${msg.content}`)
     .join('\n\n');
 }
 
-/**
- * Analyze transcript
- */
 function analyzeTranscript(transcript: string): {
   clarity: DimensionScore;
   patience: DimensionScore;
@@ -58,46 +51,39 @@ function analyzeTranscript(transcript: string): {
   return {
     clarity: {
       score: Math.round(clarityScore),
-      justification:
-        clarityScore >= 7
-          ? 'Clear explanations with examples.'
-          : 'Needs more clarity and examples.',
+      justification: clarityScore >= 7
+        ? 'Clear explanations with examples.'
+        : 'Needs more clarity and examples.',
       quotes: ['Explained clearly'],
       examples: ['Used step-by-step explanation'],
     },
     patience: {
       score: Math.round(patienceScore),
-      justification:
-        patienceScore >= 7
-          ? 'Demonstrated patience.'
-          : 'Could improve patience.',
+      justification: patienceScore >= 7
+        ? 'Demonstrated patience.'
+        : 'Could improve patience.',
       quotes: ['Encouraging responses'],
       examples: ['Did not rush'],
     },
     adaptability: {
       score: Math.round(adaptabilityScore),
-      justification:
-        adaptabilityScore >= 7
-          ? 'Adapted teaching methods.'
-          : 'Needs better adaptability.',
+      justification: adaptabilityScore >= 7
+        ? 'Adapted teaching methods.'
+        : 'Needs better adaptability.',
       quotes: ['Changed approach'],
       examples: ['Used alternatives'],
     },
     warmth: {
       score: Math.round(warmthScore),
-      justification:
-        warmthScore >= 7
-          ? 'Warm and encouraging.'
-          : 'Could be more engaging.',
+      justification: warmthScore >= 7
+        ? 'Warm and encouraging.'
+        : 'Could be more engaging.',
       quotes: ['Positive tone'],
       examples: ['Encouraged student'],
     },
   };
 }
 
-/**
- * POST /api/evaluate
- */
 export async function POST(
   request: NextRequest
 ): Promise<NextResponse<ApiResponse<IEvaluation>>> {
@@ -113,7 +99,6 @@ export async function POST(
 
     await connectDB();
 
-    // ✅ Check session
     const session = await Session.findById(sessionId);
     if (!session) {
       return NextResponse.json(
@@ -122,7 +107,6 @@ export async function POST(
       );
     }
 
-    // ✅ Get messages
     const messages = await Message.find({ sessionId })
       .sort({ timestamp: 1 })
       .lean();
@@ -166,8 +150,16 @@ export async function POST(
       modelUsed: 'rule-based',
     };
 
-    // ✅ Save in MongoDB
-    const saved = await Evaluation.create(evaluation);
+    // 🔥 FIXED: UPSERT instead of create
+    const saved = await Evaluation.findOneAndUpdate(
+      { sessionId },
+      evaluation,
+      {
+        upsert: true,
+        new: true,
+        setDefaultsOnInsert: true,
+      }
+    );
 
     return NextResponse.json(
       {
@@ -177,7 +169,7 @@ export async function POST(
           ...evaluation,
         },
       },
-      { status: 201 }
+      { status: 200 }
     );
   } catch (error) {
     console.error('Evaluation error:', error);
