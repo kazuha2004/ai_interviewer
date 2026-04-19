@@ -25,7 +25,8 @@ export function InterviewClientComponent() {
   const [duration, setDuration] = useState(0);
   const [interviewMode, setInterviewMode] = useState<InterviewMode>('interviewer');
 
-  const [hasStarted, setHasStarted] = useState(false); // 🔥 ADDED
+  // 🔥 FIX: prevent duplicate initial message
+  const hasStartedRef = React.useRef(false);
 
   const speechRecognition = useSpeechRecognition({
     language: 'en-US',
@@ -59,10 +60,12 @@ export function InterviewClientComponent() {
     load();
   }, [sessionId]);
 
-  // ── 🔥 AUTO START INTERVIEW (FIX DEAD TALK) ──
+  // ── 🔥 AUTO START INTERVIEW (FIXED + NO DUPLICATE) ──
   useEffect(() => {
     const startInterview = async () => {
-      if (!sessionId || hasStarted || messages.length > 0) return;
+      if (!sessionId || hasStartedRef.current) return;
+
+      hasStartedRef.current = true;
 
       try {
         setIsProcessing(true);
@@ -93,13 +96,10 @@ export function InterviewClientComponent() {
         if (updated.success && updated.data?.messages) {
           setMessages(updated.data.messages);
 
-          // 🔊 AI speaks first question
           if (speechSynthesis.isSupported && ai) {
             speechSynthesis.speak(ai);
           }
         }
-
-        setHasStarted(true);
       } catch (err) {
         console.error('Auto start error:', err);
       } finally {
@@ -108,7 +108,7 @@ export function InterviewClientComponent() {
     };
 
     startInterview();
-  }, [sessionId, messages, hasStarted, speechSynthesis]);
+  }, [sessionId]);
 
   // ── Timer ──
   useEffect(() => {
@@ -116,7 +116,7 @@ export function InterviewClientComponent() {
     return () => clearInterval(interval);
   }, []);
 
-  // ── Spacebar shortcut to toggle recording ──
+  // ── Spacebar shortcut ──
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' && e.target === document.body) {
@@ -143,7 +143,7 @@ export function InterviewClientComponent() {
     speechRecognition.startListening();
   }, [speechRecognition]);
 
-  // ── Stop recording + send ──
+  // ── Stop recording ──
   const handleStopRecording = useCallback(async () => {
     speechRecognition.stopListening();
     await new Promise((r) => setTimeout(r, 400));
@@ -179,12 +179,15 @@ export function InterviewClientComponent() {
       const updated = await GET<Session & { messages?: Message[] }>(`/sessions/${sessionId}`);
       if (updated.success && updated.data?.messages) {
         setMessages(updated.data.messages);
+
         if (speechSynthesis.isSupported && ai) {
           speechSynthesis.speak(ai);
         }
       }
 
-      setInterviewMode((prev) => (prev === 'interviewer' ? 'student' : 'interviewer'));
+      setInterviewMode((prev) =>
+        prev === 'interviewer' ? 'student' : 'interviewer'
+      );
     } catch {
       setError('Failed to process response — please try again');
     } finally {
@@ -201,7 +204,7 @@ export function InterviewClientComponent() {
       setIsFinishing(true);
       setIsProcessing(true);
 
-      const updateRes = await fetch(`/api/sessions/${sessionId}`, {
+      await fetch(`/api/sessions/${sessionId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -210,7 +213,7 @@ export function InterviewClientComponent() {
         }),
       });
 
-      const evalRes = await fetch('/api/evaluate', {
+      await fetch('/api/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId }),
@@ -225,7 +228,7 @@ export function InterviewClientComponent() {
     }
   }, [sessionId, session, isFinishing, router]);
 
-  // ── Loading screen ──
+  // ── Loading ──
   if (isLoading) {
     return (
       <div className="h-screen flex flex-col items-center justify-center gap-4 bg-[#050508]">
