@@ -18,63 +18,73 @@ export async function OPTIONS() {
 // ✅ GET
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // 🔥 FIXED
 ) {
   try {
-    const { id } = params;
+    const { id } = await params; // 🔥 FIXED
 
     await connectDB();
 
     const session = await Session.findById(id).lean();
     if (!session) {
-      return new Response(JSON.stringify({ success: false, error: "Session not found" }), {
-        status: 404,
-        headers: corsHeaders,
-      });
+      return new Response(
+        JSON.stringify({ success: false, error: "Session not found" }),
+        { status: 404, headers: corsHeaders }
+      );
     }
 
-    const messages = await Message.find({ sessionId: id }).sort({ timestamp: 1 }).lean();
+    const messages = await Message.find({ sessionId: id })
+      .sort({ timestamp: 1 })
+      .lean();
+
     const evaluation = await Evaluation.findOne({ sessionId: id }).lean();
 
-    return new Response(JSON.stringify({
-      success: true,
-      data: {
-        ...session,
-        messages,
-        evaluation,
-      },
-    }), { status: 200, headers: corsHeaders });
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: {
+          ...session,
+          messages,
+          evaluation,
+        },
+      }),
+      { status: 200, headers: corsHeaders }
+    );
 
-  } catch {
-    return new Response(JSON.stringify({ success: false, error: "Failed to fetch session" }), {
-      status: 500,
-      headers: corsHeaders,
-    });
+  } catch (error) {
+    console.error("GET session error:", error);
+
+    return new Response(
+      JSON.stringify({ success: false, error: "Failed to fetch session" }),
+      { status: 500, headers: corsHeaders }
+    );
   }
 }
 
 // ✅ PUT
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // 🔥 FIXED
 ) {
   try {
-    const { id } = params;
+    const { id } = await params; // 🔥 FIXED
     const body = await req.json();
 
     await connectDB();
 
     const updated = await Session.findByIdAndUpdate(id, body, { new: true }).lean();
 
-    return new Response(JSON.stringify({ success: true, data: updated }), {
-      status: 200,
-      headers: corsHeaders,
-    });
+    return new Response(
+      JSON.stringify({ success: true, data: updated }),
+      { status: 200, headers: corsHeaders }
+    );
 
-  } catch {
-    return new Response(JSON.stringify({ success: false, error: "Update failed" }), {
-      status: 500,
-      headers: corsHeaders,
-    });
+  } catch (error) {
+    console.error("PUT session error:", error);
+
+    return new Response(
+      JSON.stringify({ success: false, error: "Update failed" }),
+      { status: 500, headers: corsHeaders }
+    );
   }
 }
