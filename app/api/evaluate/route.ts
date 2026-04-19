@@ -22,11 +22,48 @@ export async function POST(req: NextRequest) {
 
     const messages = await Message.find({ sessionId }).lean();
 
-    const score = Math.floor(Math.random() * 10) + 1;
+    // 🧠 FILTER USER ANSWERS
+    const userMessages = messages.filter(m => m.role === "user");
+
+    // 🧠 BASIC ANALYSIS
+    const totalAnswers = userMessages.length;
+    const totalWords = userMessages.reduce(
+      (acc, msg) => acc + msg.content.split(" ").length,
+      0
+    );
+
+    const avgWords = totalAnswers > 0 ? totalWords / totalAnswers : 0;
+
+    // 🧠 KEYWORD CHECK
+    const keywords = ["example", "explain", "step", "student", "understand", "teach"];
+    const keywordHits = userMessages.reduce((count, msg) => {
+      const text = msg.content.toLowerCase();
+      return count + keywords.filter(k => text.includes(k)).length;
+    }, 0);
+
+    // 🎯 SCORING LOGIC (simple but meaningful)
+
+    const clarity = Math.min(10, Math.floor(avgWords / 5) + Math.floor(keywordHits / 2));
+    const patience = Math.min(10, totalAnswers + 2);
+    const adaptability = Math.min(10, Math.floor(keywordHits / 2) + 3);
+    const warmth = Math.min(10, Math.floor(avgWords / 6) + 2);
+
+    const overall = Math.round(
+      (clarity * 0.3 + patience * 0.25 + adaptability * 0.25 + warmth * 0.2)
+    );
+
+    const evaluationData = {
+      sessionId,
+      clarity: { score: clarity },
+      patience: { score: patience },
+      adaptability: { score: adaptability },
+      warmth: { score: warmth },
+      overall: { score: overall }
+    };
 
     const evaluation = await Evaluation.findOneAndUpdate(
       { sessionId },
-      { sessionId, score },
+      evaluationData,
       { upsert: true, new: true }
     );
 
@@ -35,7 +72,9 @@ export async function POST(req: NextRequest) {
       headers: corsHeaders,
     });
 
-  } catch {
+  } catch (error) {
+    console.error("Evaluation ERROR:", error);
+
     return new Response(JSON.stringify({ success: false, error: "Evaluation failed" }), {
       status: 500,
       headers: corsHeaders,
