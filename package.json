@@ -5,11 +5,11 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "start": "node .next/standalone/server.js",
+    "lint": "next lint"
   },
   "dependencies": {
-    "anthropic": "^0.0.0",
+    "@anthropic-ai/sdk": "^0.90.0",
     "dotenv": "^17.4.2",
     "framer-motion": "^12.38.0",
     "mongoose": "^9.4.1",
