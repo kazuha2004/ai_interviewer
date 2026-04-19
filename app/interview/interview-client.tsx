@@ -25,6 +25,8 @@ export function InterviewClientComponent() {
   const [duration, setDuration] = useState(0);
   const [interviewMode, setInterviewMode] = useState<InterviewMode>('interviewer');
 
+  const [hasStarted, setHasStarted] = useState(false); // 🔥 ADDED
+
   const speechRecognition = useSpeechRecognition({
     language: 'en-US',
     continuous: true,
@@ -56,6 +58,57 @@ export function InterviewClientComponent() {
 
     load();
   }, [sessionId]);
+
+  // ── 🔥 AUTO START INTERVIEW (FIX DEAD TALK) ──
+  useEffect(() => {
+    const startInterview = async () => {
+      if (!sessionId || hasStarted || messages.length > 0) return;
+
+      try {
+        setIsProcessing(true);
+
+        const res = await fetch('/api/conversation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userMessage: '__start__',
+            sessionId,
+            mode: 'interviewer',
+          }),
+        });
+
+        if (!res.ok) throw new Error('Failed to start interview');
+
+        let ai = '';
+        const reader = res.body?.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader!.read();
+          if (done) break;
+          ai += decoder.decode(value);
+        }
+
+        const updated = await GET<Session & { messages?: Message[] }>(`/sessions/${sessionId}`);
+        if (updated.success && updated.data?.messages) {
+          setMessages(updated.data.messages);
+
+          // 🔊 AI speaks first question
+          if (speechSynthesis.isSupported && ai) {
+            speechSynthesis.speak(ai);
+          }
+        }
+
+        setHasStarted(true);
+      } catch (err) {
+        console.error('Auto start error:', err);
+      } finally {
+        setIsProcessing(false);
+      }
+    };
+
+    startInterview();
+  }, [sessionId, messages, hasStarted, speechSynthesis]);
 
   // ── Timer ──
   useEffect(() => {
@@ -93,8 +146,6 @@ export function InterviewClientComponent() {
   // ── Stop recording + send ──
   const handleStopRecording = useCallback(async () => {
     speechRecognition.stopListening();
-
-    // Brief delay to let the final transcript settle
     await new Promise((r) => setTimeout(r, 400));
 
     const text = speechRecognition.transcript.trim();
@@ -115,7 +166,6 @@ export function InterviewClientComponent() {
 
       if (!res.ok) throw new Error('Conversation API error');
 
-      // Stream AI response
       let ai = '';
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
@@ -126,7 +176,6 @@ export function InterviewClientComponent() {
         ai += decoder.decode(value);
       }
 
-      // Refresh messages
       const updated = await GET<Session & { messages?: Message[] }>(`/sessions/${sessionId}`);
       if (updated.success && updated.data?.messages) {
         setMessages(updated.data.messages);
@@ -135,7 +184,6 @@ export function InterviewClientComponent() {
         }
       }
 
-      // Alternate mode each turn
       setInterviewMode((prev) => (prev === 'interviewer' ? 'student' : 'interviewer'));
     } catch {
       setError('Failed to process response — please try again');
@@ -161,14 +209,12 @@ export function InterviewClientComponent() {
           endedAt: new Date().toISOString(),
         }),
       });
-      if (!updateRes.ok) throw new Error('Failed to update session');
 
       const evalRes = await fetch('/api/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId }),
       });
-      if (!evalRes.ok) throw new Error('Failed to evaluate session');
 
       router.push(`/results/${sessionId}`);
     } catch {
@@ -183,10 +229,7 @@ export function InterviewClientComponent() {
   if (isLoading) {
     return (
       <div className="h-screen flex flex-col items-center justify-center gap-4 bg-[#050508]">
-        <div
-          className="w-10 h-10 rounded-full border-2 border-violet-500/30 border-t-violet-500 animate-spin"
-          aria-hidden
-        />
+        <div className="w-10 h-10 rounded-full border-2 border-violet-500/30 border-t-violet-500 animate-spin" />
         <p className="text-slate-500 text-sm font-medium">Loading interview…</p>
       </div>
     );
@@ -195,39 +238,12 @@ export function InterviewClientComponent() {
   return (
     <div className="h-screen overflow-hidden flex flex-col">
 
-      {/* ── Error banner ── */}
       {error && (
         <div className="flex-shrink-0 flex items-center gap-3 px-4 py-3 bg-red-950/70 border-b border-red-800/40 z-30">
-          <svg
-            className="w-4 h-4 text-red-400 flex-shrink-0"
-            fill="currentColor"
-            viewBox="0 0 20 20"
-            aria-hidden
-          >
-            <path
-              fillRule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-9V7a1 1 0 10-2 0v2a1 1 0 102 0zm0 4a1 1 0 11-2 0 1 1 0 012 0z"
-              clipRule="evenodd"
-            />
-          </svg>
-          <span className="text-red-300 text-sm flex-1 min-w-0 truncate">{error}</span>
-          <button
-            onClick={() => setError('')}
-            className="flex-shrink-0 text-red-500 hover:text-red-300 transition-colors p-0.5 rounded"
-            aria-label="Dismiss error"
-          >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
-              <path
-                fillRule="evenodd"
-                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </button>
+          <span className="text-red-300 text-sm flex-1 truncate">{error}</span>
         </div>
       )}
 
-      {/* ── Main layout ── */}
       <div className="flex-1 min-h-0 overflow-hidden">
         <InterviewLayout
           isInterview={true}
