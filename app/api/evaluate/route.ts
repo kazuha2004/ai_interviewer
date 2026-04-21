@@ -3,7 +3,6 @@ import { connectDB } from '@/lib/mongodb';
 import { Message } from '@/models/message';
 import { Evaluation } from '@/models/evaluation';
 
-// 🔥 CORS
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",

@@ -204,7 +204,7 @@ export function AvatarSection({
                   ease: 'easeInOut',
                 }}
                 className="w-0.5 rounded-full origin-center"
-                style={{ height: 24, background: cfg.accent }}
+                style={{ height: 22, background: cfg.accent }}
               />
             ))}
           </motion.div>
